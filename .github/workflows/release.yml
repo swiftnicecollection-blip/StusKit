@@ -1,37 +1,53 @@
-name: Build & Publish APK Release
+name: Build & Publish ABI Split APKs
 
 on:
+  workflow_dispatch: # Allows manual trigger from GitHub UI
   push:
     tags:
-      - 'v*'  # Triggers when you push a tag like v1.0.0, v1.0.1, etc.
+      - 'v*' # Triggers on tags like v1.0.0, v1.0.1
+
+permissions:
+  contents: write # REQUIRED: Gives GitHub permission to create a Release
 
 jobs:
-  release:
+  build-and-release:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      # Step 1: Checkout repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
+      # Step 2: Set up Java Development Kit (JDK 17)
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
+      # Step 3: Set up Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
+          channel: 'stable'
+          cache: true
 
-      - name: Install dependencies
+      # Step 4: Install Flutter Dependencies
+      - name: Install Dependencies
         run: flutter pub get
 
-      - name: Build APK
-        run: flutter build apk --release
+      # Step 5: Build ABI Split APKs
+      - name: Build Split APKs
+        run: flutter build apk --release --split-per-abi
 
-      - name: Create Release and Upload APK
-        uses: softprops/action-gh-release@v1
+      # Step 6: Publish All Generated APKs to GitHub Releases
+      - name: Create Release and Upload APKs
+        uses: softprops/action-gh-release@v3
         with:
-          files: build/app/outputs/flutter-apk/app-release.apk
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          # The asterisk (*) matches all ABI outputs (arm64-v8a, armeabi-v7a, x86_64)
+          files: build/app/outputs/flutter-apk/app-*-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
